@@ -1,37 +1,21 @@
-FROM ubuntu:20.04
+FROM node:lts-alpine as build-stage
+RUN cd ..
+RUN mkdir /frontend
+WORKDIR /frontend
+COPY ./frontend/package*.json ./
+RUN npm install
+COPY ./frontend .
+RUN npm run build
 
-# Setup python and java and base system
-ENV DEBIAN_FRONTEND noninteractive
+FROM ubuntu:20.04 as backend-builder
 ENV LANG=en_US.UTF-8
-
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -q -y openjdk-8-jdk python3-pip libsnappy-dev language-pack-en supervisor
-
+    apt-get install -q -y openjdk-8-jdk python3-pip libsnappy-dev supervisor
 RUN pip3 install --upgrade pip requests
-RUN pip3 install python-docx docxtpl tika numpy pandas
-RUN pip3 install -U setuptools wheel
-RUN pip3 install -U spacy
-
-RUN mkdir ./app
-COPY . ./app
-WORKDIR ./app
-
-
-
-# verify permissions set
-RUN ls -lah /usr/lib/python3/dist-packages/
-
-# put the requirements file into the container
-COPY requirements.txt ./requirements.txt
-
-# install the requirements in the container
-RUN pip install -r requirements.txt \
-  && chmod 777 /usr/lib/python3/dist-packages/*
-
-# verify permissions set
-RUN ls -lah /usr/lib/python3/dist-packages/
-
-EXPOSE 8501
-
-CMD sudo streamlit run app.py --server.port $PORT
+RUN mkdir /app
+COPY ./app /app
+WORKDIR /app
+RUN pip3 install -r requirements.txt
+COPY --from=build-stage /frontend/dist /app/dist
+RUN ls
